@@ -34,7 +34,7 @@ FAUCET_SEED        = str(c["FAUCET"]["seed"])
 FAUCET_PRIVKEY     = str(c["FAUCET"]["private_key"])
 if FAUCET_PRIVKEY == "":
     FAUCET_PRIVKEY = str(seed_to_privkey(FAUCET_SEED).hex())
-FAUCET_ADDRESS     = str(privkey_to_address(bytes.fromhex(FAUCET_PRIVKEY), hrp=BECH32_HRP))
+FAUCET_ADDRESS     = str(c["FAUCET"]["faucet_address"])
 EXPLORER_URL       = str(c["OPTIONAL"]["explorer_url"])
 if EXPLORER_URL != "":
     EXPLORER_URL = f'{EXPLORER_URL}/transactions/'
@@ -76,12 +76,11 @@ async def on_message(message):
 
     if message.content.startswith('$balance'):
         address = str(message.content).replace("$balance", "").replace(" ", "").lower()
-        if str(address[:3]) == BECH32_HRP and len(address) == 42:
+        if address[:len(BECH32_HRP)] == BECH32_HRP:
             coins = await api.get_addr_balance(session, address)
             if len(coins) >= 1:
                 await message.channel.send(f'{message.author.mention}\n'
-                                           f'```{api.coins_dict_to_string(coins, headers="no")}```')
-
+                                           f'```{api.coins_dict_to_string(coins, "grid")}```')
             else:
                 await message.channel.send(f'{message.author.mention} account is not initialized (balance is empty)')
 
@@ -102,8 +101,7 @@ async def on_message(message):
                          f'Syncs?:        {s["result"]["sync_info"]["catching_up"]}\n' \
                          f'Last block:    {s["result"]["sync_info"]["latest_block_height"]}\n' \
                          f'Voting power:  {s["result"]["validator_info"]["voting_power"]}\n' \
-                         f'Sequence:      {seq}\n' \
-                         f'Coins:\n{api.coins_dict_to_string(coins, headers="no")}```'
+                         f'Faucet balance:\n{api.coins_dict_to_string(coins, "")}```'
                 await message.channel.send(s)
 
         except Exception as statusErr:
@@ -131,8 +129,7 @@ async def on_message(message):
                     tx = f'```' \
                          f'From:    {from_}\n' \
                          f'To:      {to_}\n' \
-                         f'{api.coins_dict_to_string(sended_coins, headers="no")}```\n' \
-                         f'raw_log: {raw_log[:150]}'
+                         f'Amount:  {sended_coins}```'
 
                     await message.channel.send(tx)
                 else:
@@ -147,10 +144,11 @@ async def on_message(message):
     if message.content.startswith('$request') and message.channel.name in LISTENING_CHANNELS:
         channel = message.channel
         requester_address = str(message.content).replace("$request", "").replace(" ", "").lower()
+        faucet_address_length = len(FAUCET_ADDRESS)
 
-        if len(requester_address) != 42 or requester_address[:3] != BECH32_HRP:
+        if len(requester_address) != faucet_address_length or requester_address[:len(BECH32_HRP)] != BECH32_HRP:
             await channel.send(f'{requester.mention}, Invalid address format `{requester_address}`\n'
-                               f'Address length must be equal 42 and the suffix must be `{BECH32_HRP}`')
+                               f'Address length must be equal {faucet_address_length} and the suffix must be `{BECH32_HRP}`')
             return
 
         if requester.id in ACTIVE_REQUESTS:
@@ -176,7 +174,7 @@ async def on_message(message):
 
             coins = await api.get_addr_balance(session, FAUCET_ADDRESS)
             seq, acc_num = await api.get_address_info(session, FAUCET_ADDRESS)
-            #print(f'{coins=} {seq=} {acc_num=}')
+            print(f'{coins=} {seq=} {acc_num=}')
             coins = {i: coins[i] for i in coins if int(coins[i]) > int(AMOUNT_TO_SEND_LST[0])}
 
             transaction = await api.send_tx(session, recipient=requester_address,

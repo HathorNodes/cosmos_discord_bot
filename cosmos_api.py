@@ -114,7 +114,7 @@ async def get_transaction_info(session, trans_id_hex: str):
 
 
 async def send_tx(session, recipient: str, denom_lst: list, amount: list) -> str:
-    url_ = f'{REST_PROVIDER}/txs'
+    url_ = f'{REST_PROVIDER}/cosmos/tx/v1beta1/txs'
     try:
         sequence, acc_number = await get_address_info(session, FAUCET_ADDRESS)
         txs = await gen_transaction(recipient_=recipient, sequence=sequence,
@@ -143,7 +143,7 @@ async def gen_transaction(recipient_: str, sequence: int, denom: list, account_n
         memo=memo,
         chain_id=chain_id_,
         hrp=BECH32_HRP,
-        sync_mode="sync"
+        sync_mode="BROADCAST_MODE_ASYNC"
     )
     if type(denom) is list:
         for i, den in enumerate(denom):
